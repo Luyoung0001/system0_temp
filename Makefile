@@ -1,9 +1,10 @@
 .PHONY: \
-	setup setup-go init init-go build build-go clean clean-go \
-	setup-bin build-bin clean-bin \
-	setup-test build-test test-run-add test-run-all clean-test \
-	setup-soc-go-src init-soc-go \
-	setup-soc-go setup-soc-ysyx check-soc-wrapper setup-soc-int \
+		check-locked-deps \
+		setup setup-go init init-go build build-go clean clean-go \
+		setup-bin build-bin clean-bin \
+		setup-test build-test test-run-add test-run-all clean-test \
+		setup-soc-go-src init-soc-go \
+		setup-soc-go setup-soc-ysyx check-soc-wrapper setup-soc-int \
 	build-soc-bin setup-soc-test build-soc-test \
 	test-run-soc-add test-run-soc-all clean-soc \
 	flow shell
@@ -17,13 +18,17 @@ SOC_BIN_WS ?= bazel-soc-bin
 SOC_BIN_TARGET ?= //:soc_top_bin
 SOC_SIM_BIN ?= soc_top
 SOC_TEST_WS ?= bazel-soc-test
+ALLOW_DIRTY ?= 0
+
+check-locked-deps:
+	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
 
 # ----------------------------------------------------------------------
 # bazel-go: Chisel/Scala -> SystemVerilog
 # ----------------------------------------------------------------------
 setup: setup-go
 
-setup-go:
+setup-go: check-locked-deps
 	cd bazel-go && ln -sfn ../CL3/cl3/src/scala src
 	cd bazel-go && ln -sfn ../CL3/cl3/resources resources
 
@@ -80,7 +85,7 @@ clean-test:
 # ----------------------------------------------------------------------
 # Plan-1 integration: ysyxSoC + CL3 (single executable)
 # ----------------------------------------------------------------------
-setup-soc-go-src:
+setup-soc-go-src: check-locked-deps
 	@test -d "$(SOC_GO_WS)" || \
 	( \
 		echo "[soc] missing workspace: $(SOC_GO_WS)"; \
