@@ -1,0 +1,83 @@
+"""ysyxSoC Chisel to Verilog compilation with Bazel"""
+
+module(
+    name = "bazel-soc-go",
+)
+
+bazel_dep(name = "rules_jvm_external", version = "6.7")
+bazel_dep(name = "rules_scala", version = "7.1.5")
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+
+scala_config = use_extension("@rules_scala//scala/extensions:config.bzl", "scala_config")
+scala_config.settings(scala_version = "2.13.12")
+use_repo(scala_config, "rules_scala_config")
+
+scala_deps = use_extension("@rules_scala//scala/extensions:deps.bzl", "scala_deps")
+scala_deps.overridden_artifact(
+    name = "io_bazel_rules_scala_scala_library",
+    artifact = "org.scala-lang:scala-library:2.13.12",
+    sha256 = "c6a879e4973a60f6162668542a33eaccc2bb565d1c934fb061c5844259131dd1",
+)
+scala_deps.overridden_artifact(
+    name = "io_bazel_rules_scala_scala_reflect",
+    artifact = "org.scala-lang:scala-reflect:2.13.12",
+    sha256 = "c648ceb93a9fcbd22603e0be3d6a156723ae661f516c772a550a088bb3cbca7a",
+    deps = [
+        "@io_bazel_rules_scala_scala_library",
+    ],
+)
+scala_deps.overridden_artifact(
+    name = "io_bazel_rules_scala_scala_compiler",
+    artifact = "org.scala-lang:scala-compiler:2.13.12",
+    sha256 = "583adb1ffa7b29fdbfdd6f4c97a396af06a8a91625d059823bba1b7172242d6a",
+    deps = [
+        "@io_bazel_rules_scala_scala_library",
+        "@io_bazel_rules_scala_scala_reflect",
+        "@io_github_java_diff_utils_java_diff_utils",
+        "@org_jline_jline",
+    ],
+)
+scala_deps.scala()
+use_repo(
+    scala_deps,
+    "io_bazel_rules_scala_scala_compiler",
+    "io_bazel_rules_scala_scala_library",
+    "io_bazel_rules_scala_scala_reflect",
+    "rules_scala_toolchains",
+)
+
+SCALA_VERSION = "2.13.12"
+SCALA_VERSION_SHORT = SCALA_VERSION.rpartition(".")[0]
+CHISEL_VERSION = "6.7.0"
+CHISEL_PLUGIN_VERSION = "6.7.0"
+
+MAVEN_DEPS = {
+    "org.scala-lang:scala-compiler": SCALA_VERSION,
+    "org.scala-lang:scala-library": SCALA_VERSION,
+    "org.scala-lang:scala-reflect": SCALA_VERSION,
+}
+
+MAVEN_SHORT_DEPS = {
+    "org.chipsalliance:chisel": CHISEL_VERSION,
+    "com.lihaoyi:mainargs": "0.5.0",
+    "org.json4s:json4s-jackson": "4.0.5",
+    "com.lihaoyi:sourcecode": "0.3.1",
+}
+
+MAVEN_LONG_DEPS = {
+    "org.chipsalliance:chisel-plugin": CHISEL_PLUGIN_VERSION,
+}
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    name = "maven",
+    artifacts = ["{}_{}:{}".format(dep, SCALA_VERSION_SHORT, version) for (dep, version) in MAVEN_SHORT_DEPS.items()] +
+                ["{}_{}:{}".format(dep, SCALA_VERSION, version) for (dep, version) in MAVEN_LONG_DEPS.items()] +
+                ["{}:{}".format(dep, version) for (dep, version) in MAVEN_DEPS.items()],
+    fetch_sources = True,
+    lock_file = "//:maven_install.json",
+    repositories = [
+        "https://repo1.maven.org/maven2",
+    ],
+)
+use_repo(maven, "maven")
