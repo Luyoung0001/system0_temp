@@ -3,4 +3,4 @@
 	url = https://github.com/Luyoung0001/CL3.git
 [submodule "ysyxSoC"]
 	path = ysyxSoC
-	url = git@github.com:Luyoung0001/ysyxSoC.git
+	url = https://github.com/Luyoung0001/ysyxSoC.git
