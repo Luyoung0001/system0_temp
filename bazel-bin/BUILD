@@ -13,6 +13,7 @@ filegroup(
     srcs = [
         "cc/verilator/main.cpp",
         "cc/verilator/difftest.cpp",
+        "cc/verilator/lightsss.cpp",
         "cc/perf.cpp",
     ],
 )
