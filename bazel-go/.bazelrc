@@ -15,6 +15,10 @@ build --action_env=JAVA_HOME
 build --host_action_env=JAVA_HOME
 build --action_env=BAZEL_JAVA_HOME
 build --host_action_env=BAZEL_JAVA_HOME
+build --action_env=NIX_CFLAGS_COMPILE
+build --host_action_env=NIX_CFLAGS_COMPILE
+build --action_env=NIX_LDFLAGS
+build --host_action_env=NIX_LDFLAGS
 build --action_env=CHISEL_FIRTOOL_PATH
 build --host_action_env=CHISEL_FIRTOOL_PATH
 build --action_env=LC_ALL=C
