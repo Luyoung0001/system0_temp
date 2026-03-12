@@ -7,6 +7,16 @@
 - 稳定运行 `cpu-tests`
 - 在不破坏 CL3-only 流程的前提下，增加 SoC+CL3 集成流程
 
+它的核心意图不是“重写 CL3/ysyxSoC”，而是提供一个可复现、可迁移、可审计的集成外壳：
+
+- 把工具链版本（JDK/Bazel/Verilator/firtool/Scala）尽量固定在 `nix develop` 环境内
+- 把源码版本（CL3/ysyxSoC）固定为主仓记录的子模块指针 commit
+- 把构建流程拆成独立工作区（`bazel-go` / `bazel-bin` / `bazel-test` / `bazel-soc-*`），避免相互污染
+- 把测试资产从 CL3 中解耦到 `tests/`，让 CL3 逐步只保留 RTL 相关内容
+
+因此，`system0` 的定位是“稳定集成与验证平台”：
+同一份仓库在另一台机器上进入 `nix develop` 后，应能以相同流程复现构建与测试结果。
+
 ## 项目结构
 
 - `CL3/`：CL3 原始工程（Chisel 源码、C++ 仿真代码）
