@@ -22,6 +22,13 @@ SOC_BIN_TARGET ?= //:soc_top_bin
 SOC_SIM_BIN ?= soc_top
 SOC_TEST_WS ?= bazel-soc-test
 BAZEL ?= bazel --nohome_rc --nosystem_rc
+BAZEL_ENV_FLAGS ?= --action_env=PATH --host_action_env=PATH \
+	--action_env=JAVA_HOME --host_action_env=JAVA_HOME \
+	--action_env=BAZEL_JAVA_HOME --host_action_env=BAZEL_JAVA_HOME \
+	--action_env=CHISEL_FIRTOOL_PATH --host_action_env=CHISEL_FIRTOOL_PATH \
+	--action_env=COURSIER_CACHE --host_action_env=COURSIER_CACHE \
+	--action_env=NIX_CFLAGS_COMPILE --host_action_env=NIX_CFLAGS_COMPILE \
+	--action_env=NIX_LDFLAGS --host_action_env=NIX_LDFLAGS
 ALLOW_DIRTY ?= 0
 TESTS_DIR ?= tests
 TESTS_CPU_TESTS_DIR ?= $(TESTS_DIR)/cpu-tests/tests
@@ -129,12 +136,12 @@ setup-go: check-locked-deps
 init: init-go
 
 init-go: setup-go
-	cd bazel-go && $(BAZEL) run @maven//:pin
+	cd bazel-go && $(BAZEL) run $(BAZEL_ENV_FLAGS) @maven//:pin
 
 build: build-go
 
 build-go: setup-go
-	cd bazel-go && $(BAZEL) build //:cl3-verilog
+	cd bazel-go && $(BAZEL) build $(BAZEL_ENV_FLAGS) //:cl3-verilog
 
 clean-go:
 	cd bazel-go && $(BAZEL) clean
@@ -148,7 +155,7 @@ setup-bin: build-go
 	cd bazel-bin && ln -sfn ../CL3/cl3/src/cc cc
 
 build-bin: setup-bin
-	cd bazel-bin && $(BAZEL) build //:top_bin
+	cd bazel-bin && $(BAZEL) build $(BAZEL_ENV_FLAGS) //:top_bin
 
 clean-bin:
 	cd bazel-bin && $(BAZEL) clean
@@ -165,14 +172,14 @@ setup-test: check-cl3-dpic-mode build-bin check-test-assets
 	cd bazel-test && mkdir -p sim && ln -sfn ../../bazel-bin/bazel-bin/top sim/top
 
 build-test: setup-test
-	cd bazel-test && $(BAZEL) build //:cpu_tests_images
+	cd bazel-test && $(BAZEL) build $(BAZEL_ENV_FLAGS) //:cpu_tests_images
 
 # Run one representative test first; add more targets as needed.
 test-run-add: setup-test
-	cd bazel-test && $(BAZEL) test //:add_run
+	cd bazel-test && $(BAZEL) test $(BAZEL_ENV_FLAGS) //:add_run
 
 test-run-all: setup-test
-	cd bazel-test && $(BAZEL) test //:cpu_tests_suite
+	cd bazel-test && $(BAZEL) test $(BAZEL_ENV_FLAGS) //:cpu_tests_suite
 
 clean-test:
 	cd bazel-test && $(BAZEL) clean
@@ -192,7 +199,7 @@ setup-soc-go-src: check-locked-deps
 
 init-soc-go: setup-soc-go-src
 	cd $(SOC_GO_WS) && test -f maven_install.json || cp ../bazel-go/maven_install.json maven_install.json
-	cd $(SOC_GO_WS) && $(BAZEL) run @maven//:pin
+	cd $(SOC_GO_WS) && $(BAZEL) run $(BAZEL_ENV_FLAGS) @maven//:pin
 
 setup-soc-ysyx: setup-soc-go-src
 	@test -f ysyxSoC/rocket-chip/common.sc || \
@@ -219,7 +226,7 @@ setup-soc-ysyx: setup-soc-go-src
 		echo "[soc] run: make init-soc-go"; \
 		exit 2; \
 	)
-	cd $(SOC_GO_WS) && CHISEL_FIRTOOL_PATH=$${CHISEL_FIRTOOL_PATH_SOC:-$$CHISEL_FIRTOOL_PATH} $(BAZEL) build $(SOC_GO_TARGET)
+	cd $(SOC_GO_WS) && CHISEL_FIRTOOL_PATH=$${CHISEL_FIRTOOL_PATH_SOC:-$$CHISEL_FIRTOOL_PATH} $(BAZEL) build $(BAZEL_ENV_FLAGS) $(SOC_GO_TARGET)
 
 check-soc-wrapper:
 	@test -f "$(SOC_CPU_WRAPPER)" || \
@@ -250,7 +257,7 @@ build-soc-bin: setup-soc-int
 		exit 2; \
 	)
 	cd $(SOC_BIN_WS) && ln -sfn ../$(SOC_INT_DIR) soc-integration
-	cd $(SOC_BIN_WS) && $(BAZEL) build $(SOC_BIN_TARGET)
+	cd $(SOC_BIN_WS) && $(BAZEL) build $(BAZEL_ENV_FLAGS) $(SOC_BIN_TARGET)
 
 setup-soc-test: build-soc-bin check-test-assets
 	@test -d "$(SOC_TEST_WS)" || \
@@ -267,13 +274,13 @@ setup-soc-test: build-soc-bin check-test-assets
 	cd $(SOC_TEST_WS) && mkdir -p sim && ln -sfn ../../$(SOC_BIN_WS)/bazel-bin/$(SOC_SIM_BIN) sim/top
 
 build-soc-test: setup-soc-test
-	cd $(SOC_TEST_WS) && $(BAZEL) build //:cpu_tests_images
+	cd $(SOC_TEST_WS) && $(BAZEL) build $(BAZEL_ENV_FLAGS) //:cpu_tests_images
 
 test-run-soc-add: setup-soc-test
-	cd $(SOC_TEST_WS) && $(BAZEL) test //:add_run
+	cd $(SOC_TEST_WS) && $(BAZEL) test $(BAZEL_ENV_FLAGS) //:add_run
 
 test-run-soc-all: setup-soc-test
-	cd $(SOC_TEST_WS) && $(BAZEL) test //:cpu_tests_suite
+	cd $(SOC_TEST_WS) && $(BAZEL) test $(BAZEL_ENV_FLAGS) //:cpu_tests_suite
 
 clean-soc:
 	@if [ -d "$(SOC_BIN_WS)" ]; then cd $(SOC_BIN_WS) && $(BAZEL) clean; fi
