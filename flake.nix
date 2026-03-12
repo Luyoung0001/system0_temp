@@ -108,6 +108,8 @@
               export COURSIER_CACHE="/tmp/coursier-''${USER:-nix}"
               mkdir -p "$COURSIER_CACHE"
             }
+            export GCC_RUNTIME_LIB="${pkgs.stdenv.cc.cc.lib}/lib"
+            export NIX_LDFLAGS="''${NIX_LDFLAGS:-} -L$GCC_RUNTIME_LIB -Wl,-rpath,$GCC_RUNTIME_LIB"
             export LC_ALL=C
             export TZ=UTC
             echo "firtool available: $(command -v firtool)"
@@ -121,6 +123,7 @@
             echo "riscv gcc available: $(command -v ''${RISCV_PREFIX}gcc || echo MISSING)"
             echo "HEXDUMP_BIN: $HEXDUMP_BIN"
             echo "COURSIER_CACHE: $COURSIER_CACHE"
+            echo "GCC_RUNTIME_LIB: $GCC_RUNTIME_LIB"
           '';
         };
       }
