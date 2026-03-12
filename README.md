@@ -150,6 +150,22 @@ make test-run-soc-all
 - CL3 仿真器：`bazel-bin/bazel-bin/top`
 - SoC 仿真器：`bazel-soc-bin/bazel-bin/soc_top`
 
+## 最近更新（2026-03-12）
+
+- CL3 子模块已更新到 `74c8bdd`，包含：
+  - `difftest.cpp`：DTB 改为可选加载（环境变量 `CL3_DTB_FILE`），不再依赖硬编码绝对路径。
+  - `difftest.cpp`：当当前拍无 `commit` 时跳过严格 double-check，避免启动阶段误报。
+  - `difftest.cpp`：保持 `a1(x11)=0x80fff9f0` 初始化，与 CL3 启动约定一致。
+  - `difftest.h`：恢复 CL3-only 仿真层级宏路径（`top.u_CL3Top...`）。
+  - `CL3Config.scala`：`BOOT_ADDR` 由 `SimMemOption` 自动选择。
+  - `CL3Top.scala`：DPI-C 分支 `dmem` 连接改为显式字段映射。
+
+- `bazel-bin/BUILD` 已加入 `cc/verilator/lightsss.cpp`，避免 `top_bin` 链接缺符号。
+
+- 在 `nix develop` 环境下，CL3-only 流程已验证：
+  - `make test-run-add` 通过
+  - `make test-run-all` 通过（35/35）
+
 ## 设计原则
 
 - 保留原有 CL3-only 流程，不互相污染
