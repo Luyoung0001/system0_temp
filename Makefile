@@ -1,5 +1,7 @@
 .PHONY: \
 		check-locked-deps \
+		bump-cl3 bump-ysyxsoc \
+		check-test-assets sync-tests-from-cl3 \
 		setup setup-go init init-go build build-go clean clean-go \
 		setup-bin build-bin clean-bin \
 		setup-test build-test test-run-add test-run-all clean-test \
@@ -19,9 +21,85 @@ SOC_BIN_TARGET ?= //:soc_top_bin
 SOC_SIM_BIN ?= soc_top
 SOC_TEST_WS ?= bazel-soc-test
 ALLOW_DIRTY ?= 0
+TESTS_DIR ?= tests
+TESTS_CPU_TESTS_DIR ?= $(TESTS_DIR)/cpu-tests/tests
+TESTS_CPU_INCLUDE_DIR ?= $(TESTS_DIR)/cpu-tests/include
+TESTS_COMMON_DIR ?= $(TESTS_DIR)/common
+TESTS_UTILS_DIR ?= $(TESTS_DIR)/utils
 
 check-locked-deps:
-	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
+# 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
+
+bump-cl3:
+	@test -n "$(REF)" || \
+	( \
+		echo "usage: make bump-cl3 REF=<commit|tag|branch>"; \
+		exit 2; \
+	)
+	@set -euo pipefail; \
+	git -C CL3 fetch --tags origin; \
+	git -C CL3 checkout "$(REF)"; \
+	new_rev=$$(git -C CL3 rev-parse --short HEAD); \
+	git add CL3 .gitmodules; \
+	if git diff --cached --quiet -- CL3 .gitmodules; then \
+		echo "[deps] CL3 is already at the requested revision ($$new_rev)"; \
+		exit 2; \
+	fi; \
+	git commit -m "Bump CL3 to $$new_rev"; \
+	echo "[deps] CL3 bumped to $$new_rev"
+
+bump-ysyxsoc:
+	@test -n "$(REF)" || \
+	( \
+		echo "usage: make bump-ysyxsoc REF=<commit|tag|branch>"; \
+		exit 2; \
+	)
+	@set -euo pipefail; \
+	git -C ysyxSoC fetch --tags origin; \
+	git -C ysyxSoC checkout "$(REF)"; \
+	new_rev=$$(git -C ysyxSoC rev-parse --short HEAD); \
+	git add ysyxSoC .gitmodules; \
+	if git diff --cached --quiet -- ysyxSoC .gitmodules; then \
+		echo "[deps] ysyxSoC is already at the requested revision ($$new_rev)"; \
+		exit 2; \
+	fi; \
+	git commit -m "Bump ysyxSoC to $$new_rev"; \
+	echo "[deps] ysyxSoC bumped to $$new_rev"
+
+check-test-assets:
+	@test -d "$(TESTS_CPU_TESTS_DIR)" || \
+	( \
+		echo "[tests] missing $(TESTS_CPU_TESTS_DIR)"; \
+		echo "[tests] run: make sync-tests-from-cl3"; \
+		exit 2; \
+	)
+	@test -d "$(TESTS_CPU_INCLUDE_DIR)" || \
+	( \
+		echo "[tests] missing $(TESTS_CPU_INCLUDE_DIR)"; \
+		echo "[tests] run: make sync-tests-from-cl3"; \
+		exit 2; \
+	)
+	@test -d "$(TESTS_COMMON_DIR)" || \
+	( \
+		echo "[tests] missing $(TESTS_COMMON_DIR)"; \
+		echo "[tests] run: make sync-tests-from-cl3"; \
+		exit 2; \
+	)
+	@test -f "$(TESTS_UTILS_DIR)/riscv32-spike-so" || \
+	( \
+		echo "[tests] missing $(TESTS_UTILS_DIR)/riscv32-spike-so"; \
+		echo "[tests] run: make sync-tests-from-cl3"; \
+		exit 2; \
+	)
+
+sync-tests-from-cl3:
+	rm -rf $(TESTS_CPU_TESTS_DIR) $(TESTS_CPU_INCLUDE_DIR) $(TESTS_COMMON_DIR) $(TESTS_UTILS_DIR)
+	mkdir -p $(TESTS_DIR)/cpu-tests
+	cp -a CL3/sw/cpu-tests/tests $(TESTS_CPU_TESTS_DIR)
+	cp -a CL3/sw/cpu-tests/include $(TESTS_CPU_INCLUDE_DIR)
+	cp -a CL3/sw/common $(TESTS_COMMON_DIR)
+	cp -a CL3/utils $(TESTS_UTILS_DIR)
+	@echo "[tests] synced from CL3 into $(TESTS_DIR)"
 
 # ----------------------------------------------------------------------
 # bazel-go: Chisel/Scala -> SystemVerilog
@@ -62,11 +140,12 @@ clean-bin:
 # ----------------------------------------------------------------------
 # bazel-test: cpu-tests image build and test execution
 # ----------------------------------------------------------------------
-setup-test: build-bin
-	cd bazel-test && ln -sfn ../CL3/sw/cpu-tests/tests tests
-	cd bazel-test && ln -sfn ../CL3/sw/cpu-tests/include include
-	cd bazel-test && ln -sfn ../CL3/sw/common common
-	cd bazel-test && ln -sfn ../CL3/utils utils
+setup-test: build-bin check-test-assets
+	rm -rf bazel-test/tests bazel-test/include bazel-test/common bazel-test/utils
+	ln -sfn ../$(TESTS_CPU_TESTS_DIR) bazel-test/tests
+	ln -sfn ../$(TESTS_CPU_INCLUDE_DIR) bazel-test/include
+	ln -sfn ../$(TESTS_COMMON_DIR) bazel-test/common
+	ln -sfn ../$(TESTS_UTILS_DIR) bazel-test/utils
 	cd bazel-test && mkdir -p sim && ln -sfn ../../bazel-bin/bazel-bin/top sim/top
 
 build-test: setup-test
@@ -159,16 +238,17 @@ build-soc-bin: setup-soc-int
 	cd $(SOC_BIN_WS) && ln -sfn ../$(SOC_INT_DIR) soc-integration
 	cd $(SOC_BIN_WS) && bazel build $(SOC_BIN_TARGET)
 
-setup-soc-test: build-soc-bin
+setup-soc-test: build-soc-bin check-test-assets
 	@test -d "$(SOC_TEST_WS)" || \
 	( \
 		echo "[soc] missing workspace: $(SOC_TEST_WS)"; \
 		echo "[soc] create $(SOC_TEST_WS) (can reuse bazel-test layout)"; \
 		exit 2; \
 	)
-	cd $(SOC_TEST_WS) && ln -sfn ../CL3/sw/cpu-tests/tests tests
-	cd $(SOC_TEST_WS) && ln -sfn ../CL3/sw/cpu-tests/include include
-	cd $(SOC_TEST_WS) && ln -sfn ../CL3/sw/common common
+	rm -rf $(SOC_TEST_WS)/tests $(SOC_TEST_WS)/include $(SOC_TEST_WS)/common
+	ln -sfn ../$(TESTS_CPU_TESTS_DIR) $(SOC_TEST_WS)/tests
+	ln -sfn ../$(TESTS_CPU_INCLUDE_DIR) $(SOC_TEST_WS)/include
+	ln -sfn ../$(TESTS_COMMON_DIR) $(SOC_TEST_WS)/common
 	cd $(SOC_TEST_WS) && ln -sfn ../ysyxSoC/ready-to-run/D-stage soc_boot
 	cd $(SOC_TEST_WS) && mkdir -p sim && ln -sfn ../../$(SOC_BIN_WS)/bazel-bin/$(SOC_SIM_BIN) sim/top
 

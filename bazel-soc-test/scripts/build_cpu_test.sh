@@ -69,7 +69,14 @@ fi
 COMMON_CFLAGS="-fno-pic -march=rv32im_zicsr -mcmodel=medany -mstrict-align -mabi=ilp32"
 CFLAGS="-DMAINARGS=\"\" -lm -g -O2 -Wall ${COMMON_CFLAGS} -Iinclude -Icommon/include -Icommon -fno-asynchronous-unwind-tables -fno-builtin -fno-stack-protector -Wno-main -U_FORTIFY_SOURCE -fvisibility=hidden -fdata-sections -ffunction-sections"
 ASFLAGS="${COMMON_CFLAGS} -Iinclude -Icommon/include -Icommon"
-LDFLAGS="-z noexecstack -melf32lriscv -T common/linker.ld --defsym=_pmem_start=0x80000000 --defsym=_entry_offset=0x0 --gc-sections -e _start"
+SOC_USE_BOOTLOADER="${SOC_USE_BOOTLOADER:-0}"
+if [[ "${SOC_USE_BOOTLOADER}" == "1" ]]; then
+  PMEM_START=0x80000000
+else
+  # Direct-boot mode: execute tests at 0x20000000 to avoid slow copy loops.
+  PMEM_START=0x20000000
+fi
+LDFLAGS="-z noexecstack -melf32lriscv -T common/linker.ld --defsym=_pmem_start=${PMEM_START} --defsym=_entry_offset=0x0 --gc-sections -e _start"
 BOOT_SRC_BASE=0x20000000
 BOOT_PAYLOAD_OFFSET=0x100
 # Keep in sync with ysyxSoC/src/SoC.scala MROM address window size.
@@ -114,10 +121,15 @@ done
 "$LD" $LDFLAGS -o "${PREFIX}.elf" --start-group "${OBJS[@]}" --end-group
 "$OBJDUMP" -d "${PREFIX}.elf" > "${PREFIX}.txt"
 "$OBJCOPY" -S --set-section-flags .bss=alloc,contents -O binary "${PREFIX}.elf" "${PREFIX}.bin"
-"$OBJCOPY" -O verilog --change-addresses -0x80000000 --verilog-data-width 4 "${PREFIX}.elf" "${PREFIX}.hex"
+"$OBJCOPY" -O verilog --change-addresses -"${PMEM_START}" --verilog-data-width 4 "${PREFIX}.elf" "${PREFIX}.hex"
 "$HEXDUMP" -v -e '/4 "%08x\n"' "${PREFIX}.bin" > "${PREFIX}.mem"
 
 PAYLOAD_SIZE="$(wc -c < "${PREFIX}.bin")"
+if [[ "${SOC_USE_BOOTLOADER}" != "1" ]]; then
+  cp "${PREFIX}.bin" "${PREFIX}.soc.bin"
+  exit 0
+fi
+
 if (( BOOT_PAYLOAD_OFFSET + PAYLOAD_SIZE > BOOT_MROM_SIZE )); then
   echo "payload too large for MROM image layout: offset=0x$(printf '%x' "${BOOT_PAYLOAD_OFFSET}") size=${PAYLOAD_SIZE} mrom_size=0x$(printf '%x' "${BOOT_MROM_SIZE}")" >&2
   exit 1

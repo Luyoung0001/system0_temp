@@ -7,10 +7,10 @@
 
 ## Inputs
 
-- `tests/` -> symlink to `../CL3/sw/cpu-tests/tests`
-- `include/` -> symlink to `../CL3/sw/cpu-tests/include`
-- `common/` -> symlink to `../CL3/sw/common`
-- `utils/` -> symlink to `../CL3/utils`
+- `tests/` -> symlink to `../tests/cpu-tests/tests`
+- `include/` -> symlink to `../tests/cpu-tests/include`
+- `common/` -> symlink to `../tests/common`
+- `utils/` -> symlink to `../tests/utils`
 - `sim/top` -> symlink to `../../bazel-bin/bazel-bin/top`
 
 ## Outputs

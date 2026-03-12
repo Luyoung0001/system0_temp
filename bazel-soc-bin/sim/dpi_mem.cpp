@@ -13,7 +13,10 @@ namespace {
 std::vector<uint8_t> g_mrom_image;
 std::vector<uint8_t> g_pmem_image;
 constexpr uint32_t kMromBase = 0x20000000u;
-constexpr uint32_t kResetVector = 0x80000000u;
+constexpr uint32_t kExecBase = 0x80000000u;
+constexpr uint32_t kUncachedAliasBase = 0x90000000u;
+constexpr uint32_t kBootAliasBase = 0x20000000u;
+constexpr size_t kBootAliasSize = 0x00100000u;
 constexpr size_t kPmemSize = 0x08000000u;
 bool g_difftest_warned = false;
 int g_mrom_log_cnt = 0;
@@ -25,6 +28,7 @@ int g_diff_calls = 0;
 int g_diff_commit_log_cnt = 0;
 bool g_seen_boot_jump = false;
 bool g_seen_payload_pc = false;
+constexpr int kDiffCommitLogLimit = 64;
 
 struct DiffInfoPacked {
   uint16_t csr_waddr;
@@ -62,6 +66,25 @@ uint32_t read_u32_le(const std::vector<uint8_t> &image, uint32_t offset) {
   return value;
 }
 
+bool translate_pmem_addr(uint32_t addr, uint32_t *offset) {
+  if (offset == nullptr) {
+    return false;
+  }
+  if (addr >= kExecBase && static_cast<uint64_t>(addr) < static_cast<uint64_t>(kExecBase) + kPmemSize) {
+    *offset = addr - kExecBase;
+    return true;
+  }
+  if (addr >= kUncachedAliasBase && static_cast<uint64_t>(addr) < static_cast<uint64_t>(kUncachedAliasBase) + kPmemSize) {
+    *offset = addr - kUncachedAliasBase;
+    return true;
+  }
+  if (addr >= kBootAliasBase && static_cast<uint64_t>(addr) < static_cast<uint64_t>(kBootAliasBase) + kBootAliasSize) {
+    *offset = addr - kBootAliasBase;
+    return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 void dpi_load_image(const char *path) {
@@ -79,6 +102,8 @@ void dpi_load_image(const char *path) {
   }
 
   g_mrom_image.assign(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+  const size_t preload_size = g_mrom_image.size() > kPmemSize ? kPmemSize : g_mrom_image.size();
+  g_pmem_image.assign(g_mrom_image.begin(), g_mrom_image.begin() + preload_size);
   std::fprintf(stderr, "[soc-sim] loaded image: %s (%zu bytes)\n", path, g_mrom_image.size());
 }
 
@@ -140,10 +165,10 @@ extern "C" void psram_write(int addr, int mask, int data) {
 }
 
 extern "C" long long mem_read(unsigned int raddr, unsigned int size) {
-  if (raddr < kResetVector) {
+  uint32_t offset = 0;
+  if (!translate_pmem_addr(raddr, &offset)) {
     return 0;
   }
-  const uint32_t offset = raddr - kResetVector;
   const size_t width = (size == 3u) ? 8u : 4u;
   if (static_cast<size_t>(offset) >= g_pmem_image.size()) {
     return 0;
@@ -164,10 +189,10 @@ extern "C" long long mem_read(unsigned int raddr, unsigned int size) {
 }
 
 extern "C" void mem_write(unsigned int waddr, unsigned int mask, unsigned int wdata) {
-  if (waddr < kResetVector) {
+  uint32_t offset = 0;
+  if (!translate_pmem_addr(waddr, &offset)) {
     return;
   }
-  const uint32_t offset = waddr - kResetVector;
   if (offset >= kPmemSize) {
     return;
   }
@@ -195,13 +220,13 @@ extern "C" int difftest_step(int n, const void *info) {
   if (g_diff_calls <= 16) {
     std::fprintf(stderr, "[soc-sim][difftest] call=%d\n", g_diff_calls);
   }
-  if (info != nullptr && g_diff_commit_log_cnt < 64) {
+  if (info != nullptr) {
     const auto *arr = static_cast<const DiffInfoPacked *>(
         svGetArrayPtr(reinterpret_cast<svOpenArrayHandle>(const_cast<void *>(info))));
     if (arr == nullptr) {
       return 0;
     }
-    for (int i = 0; i < n && g_diff_commit_log_cnt < 64; ++i) {
+    for (int i = 0; i < n; ++i) {
       if (arr[i].commit != 0) {
         if (!g_seen_boot_jump && arr[i].pc == 0x20000040u) {
           std::fprintf(stderr, "[soc-sim][milestone] reached boot jump @0x20000040\n");
@@ -211,16 +236,18 @@ extern "C" int difftest_step(int n, const void *info) {
           std::fprintf(stderr, "[soc-sim][milestone] entered payload pc=0x%08x\n", arr[i].pc);
           g_seen_payload_pc = true;
         }
-        std::fprintf(
-            stderr,
-            "[soc-sim][commit] pc=0x%08x npc=0x%08x inst=0x%08x rd=%u wen=%u wdata=0x%08x skip=%u\n",
-            arr[i].pc,
-            arr[i].npc,
-            arr[i].inst,
-            static_cast<unsigned>(arr[i].rdIdx),
-            static_cast<unsigned>(arr[i].wen),
-            arr[i].wdata,
-            static_cast<unsigned>(arr[i].skip));
+        if (g_diff_commit_log_cnt < kDiffCommitLogLimit) {
+          std::fprintf(
+              stderr,
+              "[soc-sim][commit] pc=0x%08x npc=0x%08x inst=0x%08x rd=%u wen=%u wdata=0x%08x skip=%u\n",
+              arr[i].pc,
+              arr[i].npc,
+              arr[i].inst,
+              static_cast<unsigned>(arr[i].rdIdx),
+              static_cast<unsigned>(arr[i].wen),
+              arr[i].wdata,
+              static_cast<unsigned>(arr[i].skip));
+        }
         ++g_diff_commit_log_cnt;
       }
     }

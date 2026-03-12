@@ -48,6 +48,9 @@ verilator \
   -Isoc-integration/perip/uart16550/rtl \
   -Isoc-integration/cl3-verilog \
   -Isoc-integration/cl3-verilog/verification \
+  -Isoc-integration/cl3-verilog/verification/assert \
+  -Isoc-integration/cl3-verilog/verification/assume \
+  -Isoc-integration/cl3-verilog/verification/cover \
   --Wno-lint --Wno-UNOPTFLAT --Wno-BLKANDNBLK --Wno-COMBDLY --Wno-MODDUP \
   -CFLAGS "$$CXXFLAGS_EXTRA" \
   -LDFLAGS "$$LDFLAGS_EXTRA" \

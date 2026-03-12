@@ -32,6 +32,14 @@ cd "${ROOT}"
 fail=0
 for dep in "${DEPS[@]}"; do
   echo "[deps] CHECK: ${dep}"
+  submodule_url="$(git config -f .gitmodules --get "submodule.${dep}.url" || true)"
+  if [[ -z "${submodule_url}" ]]; then
+    echo "[deps] ERROR: ${dep} has no url in .gitmodules"
+    fail=1
+    continue
+  fi
+  echo "       url     : ${submodule_url}"
+
   tree_line="$(git ls-tree -d HEAD -- "${dep}" || true)"
   if [[ -z "${tree_line}" ]]; then
     echo "[deps] ERROR: ${dep} is not tracked in HEAD"
