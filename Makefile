@@ -10,7 +10,7 @@
 		setup-soc-ysyx check-soc-wrapper setup-soc-int \
 	build-soc-bin setup-soc-test build-soc-test \
 	test-run-soc-add test-run-soc-all clean-soc \
-	flow shell
+	flow shell package
 
 SOC_INT_DIR ?= soc-integration
 SOC_CPU_WRAPPER ?= CL3/soc/ysyx_00000000.sv
@@ -28,6 +28,10 @@ TESTS_CPU_INCLUDE_DIR ?= $(TESTS_DIR)/cpu-tests/include
 TESTS_COMMON_DIR ?= $(TESTS_DIR)/common
 TESTS_UTILS_DIR ?= $(TESTS_DIR)/utils
 CL3_CONFIG ?= CL3/cl3/src/scala/CL3Config.scala
+PACKAGE_NAME ?= system0-portable.tar.gz
+PACKAGE_OUT_DIR ?= $(abspath $(CURDIR))/packages
+PACKAGE_OUT ?= $(PACKAGE_OUT_DIR)/$(PACKAGE_NAME)
+PACKAGE_SRC_DIR ?= $(abspath $(CURDIR))
 
 check-locked-deps:
 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
@@ -269,3 +273,22 @@ clean: clean-go clean-bin clean-test
 
 shell:
 	nix develop
+
+package:
+	@set -eu; \
+	src_dir="$(PACKAGE_SRC_DIR)"; \
+	src_parent="$$(dirname "$$src_dir")"; \
+	src_name="$$(basename "$$src_dir")"; \
+	out_path="$(abspath $(PACKAGE_OUT))"; \
+	mkdir -p "$$(dirname "$$out_path")"; \
+	echo "[package] creating $$out_path"; \
+	cd "$$src_parent" && tar \
+		--exclude-vcs \
+		--exclude="$$src_name/packages" \
+		--exclude="$$src_name/bazel-soc-bin/out" \
+		--exclude="$$src_name/bazel-soc-test/out" \
+		--exclude="$$src_name/out" \
+		--exclude="$$src_name/.metals" \
+		--exclude="$$src_name/bazel-*/bazel-*" \
+		-czf "$$out_path" "$$src_name"; \
+	ls -lh "$$out_path"
