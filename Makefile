@@ -21,7 +21,8 @@ SOC_BIN_WS ?= bazel-soc-bin
 SOC_BIN_TARGET ?= //:soc_top_bin
 SOC_SIM_BIN ?= soc_top
 SOC_TEST_WS ?= bazel-soc-test
-BAZEL ?= bazel --nohome_rc --nosystem_rc
+BAZEL_USER_ROOT ?= $(abspath $(CURDIR))/out/bazel_user_root
+BAZEL ?= bazel --nohome_rc --nosystem_rc --output_user_root=$(BAZEL_USER_ROOT)
 BAZEL_ENV_FLAGS ?= --action_env=PATH --host_action_env=PATH \
 	--action_env=JAVA_HOME --host_action_env=JAVA_HOME \
 	--action_env=BAZEL_JAVA_HOME --host_action_env=BAZEL_JAVA_HOME \
