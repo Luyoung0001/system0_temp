@@ -103,6 +103,7 @@
             export MILL_BIN="$(command -v mill)"
             export RISCV_PREFIX="riscv64-none-elf-"
             export HEXDUMP_BIN="$(command -v hexdump)"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             export LC_ALL=C
             export TZ=UTC
             echo "firtool available: $(command -v firtool)"
@@ -115,6 +116,7 @@
             echo "RISCV_PREFIX: $RISCV_PREFIX"
             echo "riscv gcc available: $(command -v ''${RISCV_PREFIX}gcc || echo MISSING)"
             echo "HEXDUMP_BIN: $HEXDUMP_BIN"
+            echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
           '';
         };
       }
