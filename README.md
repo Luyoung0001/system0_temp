@@ -9,7 +9,8 @@
 
 ## 项目结构
 
-- `CL3/`：CL3 原始工程（Chisel 源码、C++ 仿真代码、cpu-tests 等）
+- `CL3/`：CL3 原始工程（Chisel 源码、C++ 仿真代码）
+- `tests/`：从 CL3 拆分出的测试资产（`cpu-tests` 源码、`common`、`utils`）
 - `ysyxSoC/`：ysyxSoC 原始工程（本仓只复用源码/外设/ready-to-run 资源）
 - `bazel-go/`：CL3 Chisel/Scala -> SystemVerilog（产物：`cl3-verilog`）
 - `bazel-bin/`：CL3 SystemVerilog -> Verilator 可执行文件（产物：`top`）
@@ -38,49 +39,43 @@
 
 ## SoC 启动链路关键改动
 
-为了解决当前 CL3 在 SoC 模式下未完整实现 `fence/fence.i` 带来的 I/D 一致性问题，项目做了以下工程化改动：
+当前仓库已经切换为“先保证 SoC+CL3 可稳定编译和跑通 cpu-tests”的实现，关键点如下：
 
-- PSRAM DPI-C 行为模型接通  
-  `ysyxSoC/perip/psram/psram.v` 已改为通过 DPI-C 调用读写函数（`psram_read/psram_write`），不再是“只连线不落地”的空模型。
-- 仿真内存后端实现  
-  `bazel-soc-bin/sim/dpi_mem.cpp` 实现了 `psram_read/psram_write`，把 PSRAM 访问落到仿真内存数组，并可打印关键调试日志。
-- PSRAM 双地址别名映射  
-  `ysyxSoC/src/SoC.scala`（以及 `bazel-soc-go/src/SoC.scala`）中，`APBPSRAM` 同时映射：
-  - `0x80000000`：cacheable alias（取指地址）
-  - `0x90000000`：uncached alias（搬运写入地址）
-- SoC bootloader 搬运+跳转  
-  `bazel-soc-test/common/soc_bootloader.S` 的流程是：
-  1. 从 MROM payload 区读取测试程序  
-  2. 拷贝到 `0x90000000`（绕过 DCache，确保写入真实落到 PSRAM）  
-  3. `fence` 后跳转到 `0x80000000` 执行
-- 测试镜像构建脚本参数化  
-  `bazel-soc-test/scripts/build_cpu_test.sh` 固定了：
-  - `BOOT_DST_BASE=0x90000000`
-  - `BOOT_EXEC_BASE=0x80000000`
-  从而形成“uncached 写、cacheable 取指”的稳定链路。
-- 扩大 MROM 窗口避免大用例构建失败  
-  为支持 `hello-str` 这类较大 payload，MROM 窗口从 `0x1000` 扩到 `0x100000`，并同步脚本中的 `BOOT_MROM_SIZE`。
+- 新增 `easy_box` 黑盒集合（用于补齐 SoC 里缺失或暂不关心的外设/桥接实现）  
+  目录：`ysyxSoC/perip/easy_box/`  
+  主要文件：
+  - `easy_box_apb4.v`：APB4 外设桩模块 + `ChiplinkBridge` 占位实现
+  - `easy_box_core_wrapper.v`：`core_wrapper` 最小可运行黑盒
+  - `easy_box_nmi_psram.v`：`nmi_psram` 简化行为模型
 
-### 代码改动定位（按当前版本行号）
+- SoC 主内存窗口改为三别名映射  
+  文件：`ysyxSoC/src/SoC.scala`  
+  `sdramAddressSet` 同时包含：
+  - `0x80000000`：执行别名（cacheable 视角）
+  - `0x90000000`：拷贝写入别名（uncached 视角）
+  - `0x20000000`：SoC 启动/直启别名（与当前测试流一致）
 
-- `ysyxSoC/src/SoC.scala`
-  - 第 42-45 行：`lpsram` 使用双地址别名映射  
-    `0x80000000`（cacheable alias）和 `0x90000000`（uncached alias）
-  - 第 47 行：`lmrom` 地址窗口调整为 `0x20000000 + 0x100000`
+- SDRAM AXI 侧改为最小 DPI 行为模型（支持 burst）  
+  文件：`ysyxSoC/perip/sdram/sdram_top_axi.v`  
+  通过 `mem_read/mem_write` DPI 接口落地读写，替代原先复杂控制器路径，保证 Verilator 环境下可预测、可跑通。
 
-- `ysyxSoC/perip/psram/psram.v`
-  - 第 7-8 行：接入 DPI-C 接口  
-    `psram_read` / `psram_write`
-  - 第 10-11 行：命令常量  
-    `CMD_READ = 0xEB`，`CMD_WRITE = 0x38`
-  - 第 81-105 行：写通路（解析 nibble/byte，调用 `psram_write`）
-  - 第 108-128 行：读通路（按地址取字节，调用 `psram_read`）
-  - 第 134 行：`dio` 三态输出控制（读时驱动，其他时刻高阻）
+- 仿真内存后端统一地址翻译  
+  文件：`bazel-soc-bin/sim/dpi_mem.cpp`  
+  统一把 `0x20000000 / 0x80000000 / 0x90000000` 访问映射到同一片 pmem 后端；并在加载镜像时同步初始化 pmem，减少“跳转后取指全 0”问题。
+
+- SoC 测试镜像默认改为直启（不走 bootloader 搬运）  
+  文件：`bazel-soc-test/scripts/build_cpu_test.sh`  
+  默认：`SOC_USE_BOOTLOADER=0`，程序直接链接到 `0x20000000`，生成的 `.soc.bin` 直接用于执行。  
+  兼容保留：`SOC_USE_BOOTLOADER=1` 时，仍可启用搬运模式（`0x20000000` -> `0x90000000`，再跳转 `0x80000000`）。
+
+- bootloader 中不再依赖 `fence/fence.i`  
+  文件：`bazel-soc-test/common/soc_bootloader.S`  
+  目前该路径将 `fence` 位置替换为 `nop`，避免触发 CL3 当前未完整实现的 fence 语义问题。
 
 说明：
 
-- 该方案是当前实现下的稳定工程方案，不等价于完整 cache coherence。
-- 若后续要支持自修改代码/JIT 等场景，仍建议补齐真正的 `fence.i`/cache 维护路径。
+- `ysyxSoC/perip/psram/psram.v` 在当前新流程中是最小占位模型（`dio` 高阻），cpu-tests 主路径不依赖它完成指令执行。
+- 以上改动目标是“工程稳定性优先”，并不等价于完整外设功能验证或完整 cache coherence 实现。
 
 ## 快速开始
 
@@ -134,6 +129,7 @@ make test-run-soc-all
 
 - `make build`：只生成 CL3 Verilog
 - `make build-bin`：生成 CL3 可执行文件 `bazel-bin/bazel-bin/top`
+- `make sync-tests-from-cl3`：把 `CL3/sw` 与 `CL3/utils` 的测试资产同步到根目录 `tests/`
 - `make test-run-all`：CL3-only 全量 cpu-tests
 - `make build-soc-bin`：生成 SoC+CL3 可执行文件 `bazel-soc-bin/bazel-bin/soc_top`
 - `make test-run-soc-all`：SoC+CL3 全量 cpu-tests
@@ -141,9 +137,11 @@ make test-run-soc-all
 ## 常见问题
 
 - 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`  
-  通常是某个镜像构建失败（例如 payload 超过 MROM 窗口），导致后续测试被跳过显示 `NO STATUS`。优先查看第一个 `FAILED TO BUILD` 的 genrule 报错。
+  通常是某个镜像构建失败导致后续测试被跳过。  
+  若你启用了 `SOC_USE_BOOTLOADER=1`，常见原因是 payload 超过 MROM 布局限制。优先查看第一个 `FAILED TO BUILD` 的 genrule 报错。
 - 现象：SoC 跳转到 `0x80000000` 后取到 `0x00000000`  
-  多数是“写入未真正落到可见内存”导致。当前仓库通过 `0x90000000` uncached 搬运 + `0x80000000` 执行规避该问题。
+  多数是“写入未真正落到可见内存”或地址别名不一致导致。  
+  当前默认直启模式（`SOC_USE_BOOTLOADER=0`）直接在 `0x20000000` 运行；如需搬运链路，使用 `SOC_USE_BOOTLOADER=1` 并确保 `0x200/0x900/0x800` 三别名映射一致。
 
 ## 产物位置
 
