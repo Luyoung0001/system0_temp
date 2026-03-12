@@ -19,7 +19,9 @@ def _chisel_verilog_impl(ctx):
         inputs = [ctx.executable.generator],
         outputs = [output],
         mnemonic = "ChiselVerilog",
-        use_default_shell_env = False,
+        # Keep Bazel action environment (e.g. PATH, CHISEL_FIRTOOL_PATH) so the
+        # generator can invoke required host tools reliably across machines.
+        use_default_shell_env = True,
     )
 
     return [

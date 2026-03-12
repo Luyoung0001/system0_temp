@@ -26,16 +26,16 @@
           ];
         };
 
-        firtool_1_105_0 = pkgs.stdenvNoCC.mkDerivation {
+        firtool_1_133_0 = pkgs.stdenvNoCC.mkDerivation {
           pname = "firtool";
-          version = "1.105.0";
+          version = "1.133.0";
           src = pkgs.fetchurl {
-            url = "https://github.com/llvm/circt/releases/download/firtool-1.105.0/firrtl-bin-linux-x64.tar.gz";
-            hash = "sha256-1zpJ6EE4Xw99Ktb8+JHIL4iZDj/gemi2tJBtBmF7X4Q=";
+            url = "https://github.com/llvm/circt/releases/download/firtool-1.133.0/firrtl-bin-linux-x64.tar.gz";
+            hash = "sha256-3Khh/w66n32P7EynK+rzkBnFfcWze4rG08/Fg9/dtdg=";
           };
           dontConfigure = true;
           dontBuild = true;
-          sourceRoot = "firtool-1.105.0";
+          sourceRoot = "firtool-1.133.0";
           installPhase = ''
             mkdir -p $out
             cp -r . $out/
@@ -72,7 +72,7 @@
             mill
 
             # Fixed firtool
-            firtool_1_105_0
+            firtool_1_133_0
             firtool_1_62_1
             verilator
 
@@ -98,7 +98,7 @@
             # Export JAVA_HOME to that exact root to satisfy rules_java local_jdk lookup.
             export JAVA_HOME="${pkgs.jdk21}/lib/openjdk"
             export BAZEL_JAVA_HOME="$JAVA_HOME"
-            export CHISEL_FIRTOOL_PATH="$(dirname "$(command -v firtool)")"
+            export CHISEL_FIRTOOL_PATH="${firtool_1_133_0}/bin"
             export CHISEL_FIRTOOL_PATH_SOC="${firtool_1_62_1}/bin"
             export MILL_BIN="$(command -v mill)"
             export RISCV_PREFIX="riscv64-none-elf-"

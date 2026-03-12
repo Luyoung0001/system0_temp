@@ -103,8 +103,8 @@ nix develop
 进入后会自动设置：
 
 - `JAVA_HOME` / `BAZEL_JAVA_HOME`
-- `CHISEL_FIRTOOL_PATH`
-- `CHISEL_FIRTOOL_PATH_SOC`
+- `CHISEL_FIRTOOL_PATH`（CL3 流程使用，固定为 firtool `1.133.0`）
+- `CHISEL_FIRTOOL_PATH_SOC`（SoC 流程使用，固定为 firtool `1.62.1`）
 
 ### 一次性初始化（首次或依赖变化后）
 
@@ -171,6 +171,9 @@ make test-run-soc-all
 
 ## 常见问题
 
+- 现象：`make build-go` 报 `NoSuchElementException: PATH`  
+  根因通常是 Chisel 生成动作运行时环境被清空。当前仓库已在 `bazel-go/rules/generate.bzl` 使用 `use_default_shell_env = True`，并在 Makefile 显式传递 Bazel action env，默认不应再出现该问题。
+
 - 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`  
   通常是某个镜像构建失败导致后续测试被跳过。  
   若你启用了 `SOC_USE_BOOTLOADER=1`，常见原因是 payload 超过 MROM 布局限制。优先查看第一个 `FAILED TO BUILD` 的 genrule 报错。
@@ -197,9 +200,19 @@ make test-run-soc-all
 
 - `bazel-bin/BUILD` 已加入 `cc/verilator/lightsss.cpp`，避免 `top_bin` 链接缺符号。
 
+- 构建环境已做双 firtool 固定与分流：
+  - `flake.nix` 中 CL3 固定 `firtool 1.133.0`，SoC 固定 `firtool 1.62.1`
+  - Makefile 中 `BAZEL_ENV_FLAGS`（CL3）与 `BAZEL_ENV_FLAGS_SOC`（SoC）分离传递
+  - 避免 SoC 误用新 firtool、或 CL3 误用旧 firtool 导致的 FIRRTL 降级失败
+
+- `bazel-go` 的 Chisel 规则已保留默认动作环境（`PATH`/`CHISEL_FIRTOOL_PATH` 等），修复了 `NoSuchElementException: PATH` 的生成阶段崩溃。
+
 - 在 `nix develop` 环境下，CL3-only 流程已验证：
   - `make test-run-add` 通过
   - `make test-run-all` 通过（35/35）
+
+- 在 `nix develop` 环境下，SoC+CL3 流程已验证：
+  - `make test-run-soc-all ALLOW_DIRTY=1` 通过（35/35）
 
 ## 设计原则
 
