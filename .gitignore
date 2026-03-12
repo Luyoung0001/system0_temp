@@ -5,6 +5,7 @@
 
 # Local build/test scratch
 out/
+packages/
 soc-integration/
 wave/
 build/
