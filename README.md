@@ -134,6 +134,31 @@ make test-run-soc-all
 - `make build-soc-bin`：生成 SoC+CL3 可执行文件 `bazel-soc-bin/bazel-bin/soc_top`
 - `make test-run-soc-all`：SoC+CL3 全量 cpu-tests
 
+## 子模块版本锁定与升级
+
+本仓把 `CL3` / `ysyxSoC` 当作子模块管理，`system0` 主仓会记录它们的“期望 commit”（gitlink）。
+
+### 日常检查
+
+- 执行 `make test-run-all` 或 `make test-run-soc-all` 前，会自动做 locked dependency check。
+- 输出里的：
+  - `expected`：主仓当前提交里记录的子模块 commit
+  - `actual`：你本地子模块当前 HEAD commit
+- 两者不一致会报错；子模块 dirty 也会报错（可用 `ALLOW_DIRTY=1` 临时放行本地开发）。
+
+### 正式升级子模块（推荐流程）
+
+1. 在子模块里完成修改并提交（先 `CL3/` 或 `ysyxSoC/` 内部 commit）。
+2. 回到主仓执行：
+   - `make bump-cl3 REF=<commit|tag|branch>`
+   - `make bump-ysyxsoc REF=<commit|tag|branch>`
+3. 这两个目标会自动：
+   - `checkout` 到目标版本
+   - 在主仓更新子模块指针
+   - 创建一条主仓提交（`Bump CL3 to <sha>` / `Bump ysyxSoC to <sha>`）
+
+建议 `REF` 使用完整 commit SHA，以保证跨机器可复现。
+
 ## 常见问题
 
 - 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`  
@@ -152,7 +177,7 @@ make test-run-soc-all
 
 ## 最近更新（2026-03-12）
 
-- CL3 子模块已更新到 `74c8bdd`，包含：
+- CL3 子模块已更新到 `f4c510a`，包含：
   - `difftest.cpp`：DTB 改为可选加载（环境变量 `CL3_DTB_FILE`），不再依赖硬编码绝对路径。
   - `difftest.cpp`：当当前拍无 `commit` 时跳过严格 double-check，避免启动阶段误报。
   - `difftest.cpp`：保持 `a1(x11)=0x80fff9f0` 初始化，与 CL3 启动约定一致。
