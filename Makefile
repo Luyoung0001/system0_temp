@@ -23,18 +23,18 @@ SOC_SIM_BIN ?= soc_top
 SOC_TEST_WS ?= bazel-soc-test
 BAZEL_USER_ROOT ?= $(abspath $(CURDIR))/out/bazel_user_root
 BAZEL ?= bazel --nohome_rc --nosystem_rc --output_user_root=$(BAZEL_USER_ROOT)
-BAZEL_ENV_BASE_FLAGS ?= --action_env=PATH=$(PATH) --host_action_env=PATH=$(PATH) \
-	--action_env=JAVA_HOME=$(JAVA_HOME) --host_action_env=JAVA_HOME=$(JAVA_HOME) \
-	--action_env=BAZEL_JAVA_HOME=$(BAZEL_JAVA_HOME) --host_action_env=BAZEL_JAVA_HOME=$(BAZEL_JAVA_HOME) \
-	--action_env=COURSIER_CACHE=$(COURSIER_CACHE) --host_action_env=COURSIER_CACHE=$(COURSIER_CACHE) \
+BAZEL_ENV_BASE_FLAGS ?= --action_env=PATH --host_action_env=PATH \
+	--action_env=JAVA_HOME --host_action_env=JAVA_HOME \
+	--action_env=BAZEL_JAVA_HOME --host_action_env=BAZEL_JAVA_HOME \
+	--action_env=COURSIER_CACHE --host_action_env=COURSIER_CACHE \
 	--action_env=NIX_CFLAGS_COMPILE --host_action_env=NIX_CFLAGS_COMPILE \
 	--action_env=NIX_LDFLAGS --host_action_env=NIX_LDFLAGS
 BAZEL_ENV_FLAGS ?= $(BAZEL_ENV_BASE_FLAGS) \
-	--action_env=CHISEL_FIRTOOL_PATH=$(CHISEL_FIRTOOL_PATH) \
-	--host_action_env=CHISEL_FIRTOOL_PATH=$(CHISEL_FIRTOOL_PATH)
+	--action_env=CHISEL_FIRTOOL_PATH \
+	--host_action_env=CHISEL_FIRTOOL_PATH
 BAZEL_ENV_FLAGS_SOC ?= $(BAZEL_ENV_BASE_FLAGS) \
-	--action_env=CHISEL_FIRTOOL_PATH=$(CHISEL_FIRTOOL_PATH_SOC) \
-	--host_action_env=CHISEL_FIRTOOL_PATH=$(CHISEL_FIRTOOL_PATH_SOC)
+	--action_env=CHISEL_FIRTOOL_PATH \
+	--host_action_env=CHISEL_FIRTOOL_PATH
 ALLOW_DIRTY ?= 0
 TESTS_DIR ?= tests
 TESTS_CPU_TESTS_DIR ?= $(TESTS_DIR)/cpu-tests/tests
@@ -232,7 +232,7 @@ setup-soc-ysyx: setup-soc-go-src
 		echo "[soc] run: make init-soc-go"; \
 		exit 2; \
 	)
-	cd $(SOC_GO_WS) && $(BAZEL) build $(BAZEL_ENV_FLAGS_SOC) $(SOC_GO_TARGET)
+	cd $(SOC_GO_WS) && CHISEL_FIRTOOL_PATH=$(CHISEL_FIRTOOL_PATH_SOC) $(BAZEL) build $(BAZEL_ENV_FLAGS_SOC) $(SOC_GO_TARGET)
 
 check-soc-wrapper:
 	@test -f "$(SOC_CPU_WRAPPER)" || \
