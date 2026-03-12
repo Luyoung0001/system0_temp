@@ -2,12 +2,12 @@
 		check-locked-deps \
 		check-cl3-dpic-mode \
 		bump-cl3 bump-ysyxsoc \
-		check-test-assets sync-tests-from-cl3 \
-		setup setup-go init init-go build build-go clean clean-go \
+		check-test-assets \
+		setup-go init init-go build build-go clean clean-go \
 		setup-bin build-bin clean-bin \
 		setup-test build-test test-run-add test-run-all clean-test \
 		setup-soc-go-src init-soc-go \
-		setup-soc-go setup-soc-ysyx check-soc-wrapper setup-soc-int \
+		setup-soc-ysyx check-soc-wrapper setup-soc-int \
 	build-soc-bin setup-soc-test build-soc-test \
 	test-run-soc-add test-run-soc-all clean-soc \
 	flow shell
@@ -30,7 +30,7 @@ TESTS_UTILS_DIR ?= $(TESTS_DIR)/utils
 CL3_CONFIG ?= CL3/cl3/src/scala/CL3Config.scala
 
 check-locked-deps:
-# 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
+	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
 
 bump-cl3:
 	@test -n "$(REF)" || \
@@ -103,16 +103,9 @@ check-cl3-dpic-mode:
 		exit 2; \
 	)
 
-sync-tests-from-cl3:
-	@echo "[tests] deprecated: assets are maintained directly in $(TESTS_DIR)/" ; \
-	echo "[tests] sync from CL3/sw is no longer supported" ; \
-	exit 2
-
 # ----------------------------------------------------------------------
 # bazel-go: Chisel/Scala -> SystemVerilog
 # ----------------------------------------------------------------------
-setup: setup-go
-
 setup-go: check-locked-deps
 	cd bazel-go && ln -sfn ../CL3/cl3/src/scala src
 	cd bazel-go && ln -sfn ../CL3/cl3/resources resources
@@ -185,8 +178,6 @@ init-soc-go: setup-soc-go-src
 	cd $(SOC_GO_WS) && test -f maven_install.json || cp ../bazel-go/maven_install.json maven_install.json
 	cd $(SOC_GO_WS) && bazel run @maven//:pin
 
-setup-soc-go: build-go
-
 setup-soc-ysyx: setup-soc-go-src
 	@test -f ysyxSoC/rocket-chip/common.sc || \
 	( \
@@ -222,7 +213,7 @@ check-soc-wrapper:
 		exit 2; \
 	)
 
-setup-soc-int: setup-soc-go setup-soc-ysyx check-soc-wrapper
+setup-soc-int: build-go setup-soc-ysyx check-soc-wrapper
 	mkdir -p $(SOC_INT_DIR)
 	ln -sfn ../bazel-go/bazel-bin/cl3-verilog $(SOC_INT_DIR)/cl3-verilog
 	ln -sfn ../$(SOC_SOC_VERILOG) $(SOC_INT_DIR)/ysyxSoCFull.v
