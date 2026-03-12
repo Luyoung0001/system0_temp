@@ -129,7 +129,7 @@ make test-run-soc-all
 
 - `make build`：只生成 CL3 Verilog
 - `make build-bin`：生成 CL3 可执行文件 `bazel-bin/bazel-bin/top`
-- `make sync-tests-from-cl3`：把 `CL3/sw` 与 `CL3/utils` 的测试资产同步到根目录 `tests/`
+- `tests/`：测试资产目录（已在本仓维护，不再从 `CL3/sw` 同步）
 - `make test-run-all`：CL3-only 全量 cpu-tests
 - `make build-soc-bin`：生成 SoC+CL3 可执行文件 `bazel-soc-bin/bazel-bin/soc_top`
 - `make test-run-soc-all`：SoC+CL3 全量 cpu-tests

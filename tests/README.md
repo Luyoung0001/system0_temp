@@ -10,8 +10,4 @@ This directory is the standalone test asset source for `system0`.
 `bazel-test/` and `bazel-soc-test/` do not own these files.  
 Their `setup-*` targets only create symlinks pointing to this directory.
 
-To refresh these assets from the current CL3 tree, run:
-
-```bash
-make sync-tests-from-cl3
-```
+These assets are now maintained directly in this repository.

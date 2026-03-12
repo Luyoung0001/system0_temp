@@ -1,5 +1,6 @@
 .PHONY: \
 		check-locked-deps \
+		check-cl3-dpic-mode \
 		bump-cl3 bump-ysyxsoc \
 		check-test-assets sync-tests-from-cl3 \
 		setup setup-go init init-go build build-go clean clean-go \
@@ -26,6 +27,7 @@ TESTS_CPU_TESTS_DIR ?= $(TESTS_DIR)/cpu-tests/tests
 TESTS_CPU_INCLUDE_DIR ?= $(TESTS_DIR)/cpu-tests/include
 TESTS_COMMON_DIR ?= $(TESTS_DIR)/common
 TESTS_UTILS_DIR ?= $(TESTS_DIR)/utils
+CL3_CONFIG ?= CL3/cl3/src/scala/CL3Config.scala
 
 check-locked-deps:
 # 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
@@ -70,36 +72,41 @@ check-test-assets:
 	@test -d "$(TESTS_CPU_TESTS_DIR)" || \
 	( \
 		echo "[tests] missing $(TESTS_CPU_TESTS_DIR)"; \
-		echo "[tests] run: make sync-tests-from-cl3"; \
+		echo "[tests] restore tracked assets under $(TESTS_DIR)/"; \
 		exit 2; \
 	)
 	@test -d "$(TESTS_CPU_INCLUDE_DIR)" || \
 	( \
 		echo "[tests] missing $(TESTS_CPU_INCLUDE_DIR)"; \
-		echo "[tests] run: make sync-tests-from-cl3"; \
+		echo "[tests] restore tracked assets under $(TESTS_DIR)/"; \
 		exit 2; \
 	)
 	@test -d "$(TESTS_COMMON_DIR)" || \
 	( \
 		echo "[tests] missing $(TESTS_COMMON_DIR)"; \
-		echo "[tests] run: make sync-tests-from-cl3"; \
+		echo "[tests] restore tracked assets under $(TESTS_DIR)/"; \
 		exit 2; \
 	)
 	@test -f "$(TESTS_UTILS_DIR)/riscv32-spike-so" || \
 	( \
 		echo "[tests] missing $(TESTS_UTILS_DIR)/riscv32-spike-so"; \
-		echo "[tests] run: make sync-tests-from-cl3"; \
+		echo "[tests] restore tracked assets under $(TESTS_DIR)/"; \
+		exit 2; \
+	)
+
+check-cl3-dpic-mode:
+	@grep -Eq '^[[:space:]]*val[[:space:]]+SimMemOption[[:space:]]*=[[:space:]]*"DPI-C"' "$(CL3_CONFIG)" || \
+	( \
+		echo "[mode] CL3 test-run requires DPI-C mode"; \
+		echo "[mode] please edit $(CL3_CONFIG):"; \
+		echo "       val SimMemOption = \"DPI-C\""; \
 		exit 2; \
 	)
 
 sync-tests-from-cl3:
-	rm -rf $(TESTS_CPU_TESTS_DIR) $(TESTS_CPU_INCLUDE_DIR) $(TESTS_COMMON_DIR) $(TESTS_UTILS_DIR)
-	mkdir -p $(TESTS_DIR)/cpu-tests
-	cp -a CL3/sw/cpu-tests/tests $(TESTS_CPU_TESTS_DIR)
-	cp -a CL3/sw/cpu-tests/include $(TESTS_CPU_INCLUDE_DIR)
-	cp -a CL3/sw/common $(TESTS_COMMON_DIR)
-	cp -a CL3/utils $(TESTS_UTILS_DIR)
-	@echo "[tests] synced from CL3 into $(TESTS_DIR)"
+	@echo "[tests] deprecated: assets are maintained directly in $(TESTS_DIR)/" ; \
+	echo "[tests] sync from CL3/sw is no longer supported" ; \
+	exit 2
 
 # ----------------------------------------------------------------------
 # bazel-go: Chisel/Scala -> SystemVerilog
@@ -140,7 +147,7 @@ clean-bin:
 # ----------------------------------------------------------------------
 # bazel-test: cpu-tests image build and test execution
 # ----------------------------------------------------------------------
-setup-test: build-bin check-test-assets
+setup-test: check-cl3-dpic-mode build-bin check-test-assets
 	rm -rf bazel-test/tests bazel-test/include bazel-test/common bazel-test/utils
 	ln -sfn ../$(TESTS_CPU_TESTS_DIR) bazel-test/tests
 	ln -sfn ../$(TESTS_CPU_INCLUDE_DIR) bazel-test/include
