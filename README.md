@@ -94,6 +94,30 @@
 - 安装 Nix（启用 flakes）
 - 当前目录为仓库根目录：`/home/luyoung/system0`
 
+### 首次 clone（新机器）
+
+推荐直接递归拉取子模块：
+
+```bash
+git clone --recurse-submodules git@github.com:Luyoung0001/system0_temp.git
+cd system0
+git submodule sync --recursive
+git submodule update --init --recursive --checkout
+git -C ysyxSoC submodule sync --recursive
+git -C ysyxSoC submodule update --init --recursive --checkout
+```
+
+如果你已经 clone 过（但没带 `--recurse-submodules`），在仓库根目录执行：
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive --checkout
+git -C ysyxSoC submodule sync --recursive
+git -C ysyxSoC submodule update --init --recursive --checkout
+```
+
+说明：在 `system0` 流程里，通常不需要手动执行 `cd ysyxSoC && make dev-init`。
+
 ### 进入固定环境
 
 ```bash
@@ -111,13 +135,6 @@ nix develop
 ```bash
 make init
 make init-soc-go
-```
-
-如果 SoC 子模块未初始化：
-
-```bash
-cd ysyxSoC && make dev-init
-cd ..
 ```
 
 ### 跑 CL3-only
@@ -173,6 +190,16 @@ make test-run-soc-all
 
 - 现象：`make build-go` 报 `NoSuchElementException: PATH`  
   根因通常是 Chisel 生成动作运行时环境被清空。当前仓库已在 `bazel-go/rules/generate.bzl` 使用 `use_default_shell_env = True`，并在 Makefile 显式传递 Bazel action env，默认不应再出现该问题。
+
+- 现象：`git submodule update --init --recursive --checkout` 报  
+  `not our ref b41ee216...`（`ysyxSoC/rocket-chip`）  
+  先执行：
+  ```bash
+  git submodule sync --recursive
+  git -C ysyxSoC submodule sync --recursive
+  git submodule update --init --recursive --checkout
+  ```
+  如果仍失败，说明该机器拉到的 `rocket-chip` 远端不包含 pinned commit，需要检查 `ysyxSoC/.gitmodules` 的 `rocket-chip` URL 是否与你当前可访问的 fork 一致。
 
 - 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`  
   通常是某个镜像构建失败导致后续测试被跳过。  
