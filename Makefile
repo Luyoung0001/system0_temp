@@ -28,6 +28,9 @@ TESTS_CPU_INCLUDE_DIR ?= $(TESTS_DIR)/cpu-tests/include
 TESTS_COMMON_DIR ?= $(TESTS_DIR)/common
 TESTS_UTILS_DIR ?= $(TESTS_DIR)/utils
 CL3_CONFIG ?= CL3/cl3/src/scala/CL3Config.scala
+CHISEL_FIRTOOL_PATH ?= $(patsubst %/,%,$(dir $(shell command -v firtool 2>/dev/null)))
+CHISEL_FIRTOOL_PATH_SOC ?= $(CHISEL_FIRTOOL_PATH)
+COURSIER_CACHE ?= /tmp/coursier-$(shell id -un)
 PACKAGE_NAME ?= system0-portable.tar.gz
 PACKAGE_OUT_DIR ?= $(abspath $(CURDIR))/packages
 PACKAGE_OUT ?= $(PACKAGE_OUT_DIR)/$(PACKAGE_NAME)
@@ -36,6 +39,10 @@ HASH_CL3_VERILOG_DIR ?= bazel-go/bazel-bin/cl3-verilog
 HASH_CL3_TOP_BIN ?= bazel-bin/bazel-bin/top
 HASH_SOC_VERILOG ?= bazel-soc-go/bazel-bin/ysyxSoCFull.v
 HASH_SOC_TOP_BIN ?= bazel-soc-bin/bazel-bin/$(SOC_SIM_BIN)
+
+export CHISEL_FIRTOOL_PATH
+export CHISEL_FIRTOOL_PATH_SOC
+export COURSIER_CACHE
 
 check-locked-deps:
 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh

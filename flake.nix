@@ -103,6 +103,11 @@
             export MILL_BIN="$(command -v mill)"
             export RISCV_PREFIX="riscv64-none-elf-"
             export HEXDUMP_BIN="$(command -v hexdump)"
+            export COURSIER_CACHE="''${XDG_CACHE_HOME:-$HOME/.cache}/coursier"
+            mkdir -p "$COURSIER_CACHE" 2>/dev/null || {
+              export COURSIER_CACHE="/tmp/coursier-''${USER:-nix}"
+              mkdir -p "$COURSIER_CACHE"
+            }
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             export LC_ALL=C
             export TZ=UTC
@@ -116,6 +121,7 @@
             echo "RISCV_PREFIX: $RISCV_PREFIX"
             echo "riscv gcc available: $(command -v ''${RISCV_PREFIX}gcc || echo MISSING)"
             echo "HEXDUMP_BIN: $HEXDUMP_BIN"
+            echo "COURSIER_CACHE: $COURSIER_CACHE"
             echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
           '';
         };

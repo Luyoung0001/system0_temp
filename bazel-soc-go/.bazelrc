@@ -17,3 +17,5 @@ build --action_env=LC_ALL=C
 build --host_action_env=LC_ALL=C
 build --action_env=TZ=UTC
 build --host_action_env=TZ=UTC
+build --action_env=COURSIER_CACHE
+build --host_action_env=COURSIER_CACHE

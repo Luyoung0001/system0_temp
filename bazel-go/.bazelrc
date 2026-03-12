@@ -26,3 +26,5 @@ build --host_action_env=TZ=UTC
 
 # Performance optimizations
 build --remote_cache_compression
+build --action_env=COURSIER_CACHE
+build --host_action_env=COURSIER_CACHE
