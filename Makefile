@@ -6,11 +6,11 @@
 		setup-go init init-go build build-go clean clean-go \
 		setup-bin build-bin clean-bin \
 		setup-test build-test test-run-add test-run-all clean-test \
-		setup-soc-go-src init-soc-go \
-		setup-soc-ysyx check-soc-wrapper setup-soc-int \
+	setup-soc-go-src init-soc-go \
+	setup-soc-ysyx check-soc-wrapper setup-soc-int \
 	build-soc-bin setup-soc-test build-soc-test \
 	test-run-soc-add test-run-soc-all clean-soc \
-	flow shell package
+	flow shell package hashcheck
 
 SOC_INT_DIR ?= soc-integration
 SOC_CPU_WRAPPER ?= CL3/soc/ysyx_00000000.sv
@@ -32,6 +32,10 @@ PACKAGE_NAME ?= system0-portable.tar.gz
 PACKAGE_OUT_DIR ?= $(abspath $(CURDIR))/packages
 PACKAGE_OUT ?= $(PACKAGE_OUT_DIR)/$(PACKAGE_NAME)
 PACKAGE_SRC_DIR ?= $(abspath $(CURDIR))
+HASH_CL3_VERILOG_DIR ?= bazel-go/bazel-bin/cl3-verilog
+HASH_CL3_TOP_BIN ?= bazel-bin/bazel-bin/top
+HASH_SOC_VERILOG ?= bazel-soc-go/bazel-bin/ysyxSoCFull.v
+HASH_SOC_TOP_BIN ?= bazel-soc-bin/bazel-bin/$(SOC_SIM_BIN)
 
 check-locked-deps:
 	@ALLOW_DIRTY=$(ALLOW_DIRTY) ./scripts/check_locked_deps.sh
@@ -292,3 +296,40 @@ package:
 		--exclude="$$src_name/bazel-*/bazel-*" \
 		-czf "$$out_path" "$$src_name"; \
 	ls -lh "$$out_path"
+
+hashcheck:
+	@set -eu; \
+	if command -v sha256sum >/dev/null 2>&1; then \
+		hash_cmd='sha256sum'; \
+	elif command -v shasum >/dev/null 2>&1; then \
+		hash_cmd='shasum -a 256'; \
+	else \
+		echo "[hash] ERROR: neither sha256sum nor shasum found"; \
+		exit 2; \
+	fi; \
+	hash_file() { \
+		label="$$1"; \
+		path="$$2"; \
+		if [ -f "$$path" ]; then \
+			sum=$$(eval "$$hash_cmd \"$$path\"" | awk '{print $$1}'); \
+			printf '[hash] %-18s %s  %s\n' "$$label" "$$sum" "$$path"; \
+		else \
+			printf '[hash] %-18s MISSING  %s\n' "$$label" "$$path"; \
+		fi; \
+	}; \
+	hash_dir() { \
+		label="$$1"; \
+		path="$$2"; \
+		if [ -d "$$path" ]; then \
+			sum=$$(cd "$$path" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do eval "$$hash_cmd \"$$f\""; done | eval "$$hash_cmd" | awk '{print $$1}'); \
+			count=$$(find "$$path" -type f | wc -l | tr -d ' '); \
+			printf '[hash] %-18s %s  %s (files=%s)\n' "$$label" "$$sum" "$$path" "$$count"; \
+		else \
+			printf '[hash] %-18s MISSING  %s\n' "$$label" "$$path"; \
+		fi; \
+	}; \
+	echo "[hash] key build artifact hashes"; \
+	hash_dir "cl3-verilog-dir" "$(HASH_CL3_VERILOG_DIR)"; \
+	hash_file "cl3-top-bin" "$(HASH_CL3_TOP_BIN)"; \
+	hash_file "soc-verilog" "$(HASH_SOC_VERILOG)"; \
+	hash_file "soc-top-bin" "$(HASH_SOC_TOP_BIN)"
