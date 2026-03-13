@@ -1,6 +1,6 @@
 [submodule "CL3"]
 	path = CL3
-	url = https://github.com/Luyoung0001/CL3.git
+	url = git@github.com:Luyoung0001/CL3.git
 [submodule "ysyxSoC"]
 	path = ysyxSoC
-	url = https://github.com/Luyoung0001/ysyxSoC.git
+	url = git@github.com:Luyoung0001/ysyxSoC.git
