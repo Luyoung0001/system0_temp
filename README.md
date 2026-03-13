@@ -51,35 +51,35 @@
 
 当前仓库已经切换为“先保证 SoC+CL3 可稳定编译和跑通 cpu-tests”的实现，关键点如下：
 
-- 新增 `easy_box` 黑盒集合（用于补齐 SoC 里缺失或暂不关心的外设/桥接实现）  
-  目录：`ysyxSoC/perip/easy_box/`  
+- 新增 `easy_box` 黑盒集合（用于补齐 SoC 里缺失或暂不关心的外设/桥接实现）
+  目录：`ysyxSoC/perip/easy_box/`
   主要文件：
   - `easy_box_apb4.v`：APB4 外设桩模块 + `ChiplinkBridge` 占位实现
   - `easy_box_core_wrapper.v`：`core_wrapper` 最小可运行黑盒
   - `easy_box_nmi_psram.v`：`nmi_psram` 简化行为模型
 
-- SoC 主内存窗口改为三别名映射  
-  文件：`ysyxSoC/src/SoC.scala`  
+- SoC 主内存窗口改为三别名映射
+  文件：`ysyxSoC/src/SoC.scala`
   `sdramAddressSet` 同时包含：
   - `0x80000000`：执行别名（cacheable 视角）
   - `0x90000000`：拷贝写入别名（uncached 视角）
   - `0x20000000`：SoC 启动/直启别名（与当前测试流一致）
 
-- SDRAM AXI 侧改为最小 DPI 行为模型（支持 burst）  
-  文件：`ysyxSoC/perip/sdram/sdram_top_axi.v`  
+- SDRAM AXI 侧改为最小 DPI 行为模型（支持 burst）
+  文件：`ysyxSoC/perip/sdram/sdram_top_axi.v`
   通过 `mem_read/mem_write` DPI 接口落地读写，替代原先复杂控制器路径，保证 Verilator 环境下可预测、可跑通。
 
-- 仿真内存后端统一地址翻译  
-  文件：`bazel-soc-bin/sim/dpi_mem.cpp`  
+- 仿真内存后端统一地址翻译
+  文件：`bazel-soc-bin/sim/dpi_mem.cpp`
   统一把 `0x20000000 / 0x80000000 / 0x90000000` 访问映射到同一片 pmem 后端；并在加载镜像时同步初始化 pmem，减少“跳转后取指全 0”问题。
 
-- SoC 测试镜像默认改为直启（不走 bootloader 搬运）  
-  文件：`bazel-soc-test/scripts/build_cpu_test.sh`  
-  默认：`SOC_USE_BOOTLOADER=0`，程序直接链接到 `0x20000000`，生成的 `.soc.bin` 直接用于执行。  
+- SoC 测试镜像默认改为直启（不走 bootloader 搬运）
+  文件：`bazel-soc-test/scripts/build_cpu_test.sh`
+  默认：`SOC_USE_BOOTLOADER=0`，程序直接链接到 `0x20000000`，生成的 `.soc.bin` 直接用于执行。
   兼容保留：`SOC_USE_BOOTLOADER=1` 时，仍可启用搬运模式（`0x20000000` -> `0x90000000`，再跳转 `0x80000000`）。
 
-- bootloader 中不再依赖 `fence/fence.i`  
-  文件：`bazel-soc-test/common/soc_bootloader.S`  
+- bootloader 中不再依赖 `fence/fence.i`
+  文件：`bazel-soc-test/common/soc_bootloader.S`
   目前该路径将 `fence` 位置替换为 `nop`，避免触发 CL3 当前未完整实现的 fence 语义问题。
 
 说明：
@@ -103,8 +103,6 @@ git clone --recurse-submodules git@github.com:Luyoung0001/system0_temp.git
 cd system0
 git submodule sync --recursive
 git submodule update --init --recursive --checkout
-git -C ysyxSoC submodule sync --recursive
-git -C ysyxSoC submodule update --init --recursive --checkout
 ```
 
 如果你已经 clone 过（但没带 `--recurse-submodules`），在仓库根目录执行：
@@ -112,8 +110,6 @@ git -C ysyxSoC submodule update --init --recursive --checkout
 ```bash
 git submodule sync --recursive
 git submodule update --init --recursive --checkout
-git -C ysyxSoC submodule sync --recursive
-git -C ysyxSoC submodule update --init --recursive --checkout
 ```
 
 说明：在 `system0` 流程里，通常不需要手动执行 `cd ysyxSoC && make dev-init`。
@@ -186,13 +182,115 @@ make test-run-soc-all
 
 建议 `REF` 使用完整 commit SHA，以保证跨机器可复现。
 
+## 多人协作分支规范（三仓统一）
+
+目标：多人并行开发时，保证 `system0` 可复现、可回滚，且子模块指针始终可追溯。
+
+### 分支职责
+
+- `system0/main`（或 `master`）：稳定分支，只接收通过验证的集成结果。
+- `system0/dev`：集成分支，日常协作主分支。
+- `system0/feature/<topic>`：个人功能分支，从 `dev` 切出，完成后合入 `dev`。
+- `CL3` / `ysyxSoC`：只有在需要修改对应仓库代码时，才创建 `dev`/`feature` 分支；不改代码时无需额外分支。
+
+### 场景 A：只改 system0（Makefile/README/Bazel glue）
+
+1. `git checkout -b feature/<topic> origin/dev`（或本地 `dev`）。
+2. 在 `nix develop` 下完成构建与测试。
+3. 提交到 `system0/feature/<topic>`，发 PR 合入 `system0/dev`。
+4. 阶段稳定后，再把 `system0/dev` 合入 `main`。
+
+此场景下通常不需要改 `CL3` / `ysyxSoC` 分支，只保留当前子模块锁定 commit。
+
+### 场景 B：需要改 CL3 或 ysyxSoC
+
+1. 在目标子仓（`CL3` 或 `ysyxSoC`）创建 `feature/<topic>` 分支开发。
+2. 子仓代码先提交并推送（确保远端可达）。
+3. 回到 `system0/dev`，更新子模块指针：
+   - `make bump-cl3 REF=<full_sha>`
+   - `make bump-ysyxsoc REF=<full_sha>`
+4. 在 `system0` 跑集成验证（建议至少 `make test-run-soc-all`）。
+5. 提交 `system0` 的“子模块指针 bump”提交并发 PR。
+
+### 提交顺序（必须）
+
+1. 先提交并推送子仓（CL3/ysyxSoC）。
+2. 再提交 `system0` 子模块指针更新。
+
+不要把 `system0` 指针指向“只在本地存在、远端不可 fetch”的 commit。
+
+### 每日同步建议
+
+```bash
+git pull --ff-only
+git submodule sync --recursive
+git submodule update --init --recursive --checkout
+```
+
+这三条保证：
+- 主仓代码最新；
+- 子模块 URL 与 `.gitmodules` 一致；
+- 子模块检出到主仓锁定 commit（而不是分支最新 head）。
+
+### 10 条命令速查表
+
+1. 同步主仓 + 子模块（每天开工前）
+```bash
+git pull --ff-only && git submodule sync --recursive && git submodule update --init --recursive --checkout
+```
+
+2. 切到 `system0/dev`
+```bash
+git switch dev && git pull --ff-only
+```
+
+3. 从 `dev` 开个人分支
+```bash
+git switch -c feature/<topic>
+```
+
+4. 进入固定构建环境
+```bash
+nix develop
+```
+
+5. 本地快速验证（允许子模块本地改动）
+```bash
+make test-run-soc-all ALLOW_DIRTY=1
+```
+
+6. 在 CL3 开发分支（仅当要改 CL3 代码）
+```bash
+git -C CL3 switch -c feature/<topic>
+```
+
+7. 提交并推送 CL3 改动
+```bash
+git -C CL3 add -A && git -C CL3 commit -m "<cl3-change>" && git -C CL3 push -u origin HEAD
+```
+
+8. 在 system0 更新 CL3 子模块指针
+```bash
+make bump-cl3 REF=<cl3_full_commit_sha>
+```
+
+9. 提交并推送 system0（含子模块 bump）
+```bash
+git add -A && git commit -m "<system0-change>" && git push -u origin HEAD
+```
+
+10. 其他同事机器对齐到同一版本
+```bash
+git pull --ff-only && git submodule sync --recursive && git submodule update --init --recursive --checkout
+```
+
 ## 常见问题
 
-- 现象：`make build-go` 报 `NoSuchElementException: PATH`  
+- 现象：`make build-go` 报 `NoSuchElementException: PATH`
   根因通常是 Chisel 生成动作运行时环境被清空。当前仓库已在 `bazel-go/rules/generate.bzl` 使用 `use_default_shell_env = True`，并在 Makefile 显式传递 Bazel action env，默认不应再出现该问题。
 
-- 现象：`git submodule update --init --recursive --checkout` 报  
-  `not our ref b41ee216...`（`ysyxSoC/rocket-chip`）  
+- 现象：`git submodule update --init --recursive --checkout` 报
+  `not our ref b41ee216...`（`ysyxSoC/rocket-chip`）
   先执行：
   ```bash
   git submodule sync --recursive
@@ -201,11 +299,11 @@ make test-run-soc-all
   ```
   如果仍失败，说明该机器拉到的 `rocket-chip` 远端不包含 pinned commit，需要检查 `ysyxSoC/.gitmodules` 的 `rocket-chip` URL 是否与你当前可访问的 fork 一致。
 
-- 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`  
-  通常是某个镜像构建失败导致后续测试被跳过。  
+- 现象：`make test-run-soc-all` 里大量 `NO STATUS`，且有单个 `FAILED TO BUILD`
+  通常是某个镜像构建失败导致后续测试被跳过。
   若你启用了 `SOC_USE_BOOTLOADER=1`，常见原因是 payload 超过 MROM 布局限制。优先查看第一个 `FAILED TO BUILD` 的 genrule 报错。
-- 现象：SoC 跳转到 `0x80000000` 后取到 `0x00000000`  
-  多数是“写入未真正落到可见内存”或地址别名不一致导致。  
+- 现象：SoC 跳转到 `0x80000000` 后取到 `0x00000000`
+  多数是“写入未真正落到可见内存”或地址别名不一致导致。
   当前默认直启模式（`SOC_USE_BOOTLOADER=0`）直接在 `0x20000000` 运行；如需搬运链路，使用 `SOC_USE_BOOTLOADER=1` 并确保 `0x200/0x900/0x800` 三别名映射一致。
 
 ## 产物位置
